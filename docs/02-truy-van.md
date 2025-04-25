@@ -1,35 +1,68 @@
 # Truy vấn dữ liệu trong SQL
 
-## 1. Câu lệnh SELECT cơ bản
+## 1. Câu lệnh SELECT và Cách Sử Dụng
 
-### 1.1 Cú pháp cơ bản
+### 1.1 Cấu trúc và Giải thích
 
 ```sql
-SELECT [DISTINCT] column1, column2, ...
-FROM table_name
-[WHERE condition]
-[GROUP BY column1, column2, ...]
-[HAVING group_condition]
-[ORDER BY column1 [ASC|DESC], column2 [ASC|DESC], ...]
-[LIMIT n];
+-- Cấu trúc cơ bản của câu lệnh SELECT
+SELECT [DISTINCT] column1, column2, ... -- Chọn các cột cần lấy
+FROM table_name                        -- Chỉ định bảng nguồn
+[WHERE condition]                      -- Lọc dữ liệu theo điều kiện
+[GROUP BY column1, column2, ...]       -- Nhóm dữ liệu
+[HAVING group_condition]               -- Lọc nhóm theo điều kiện
+[ORDER BY column1 [ASC|DESC], ...]     -- Sắp xếp kết quả
+[LIMIT n];                            -- Giới hạn số lượng kết quả
 ```
 
-### 1.2 Ví dụ cơ bản
+### 1.2 Ví dụ Thực Tế và Giải Thích
 
 ```sql
--- Lấy tất cả cột
+-- 1. Lấy toàn bộ thông tin nhân viên
 SELECT * FROM employees;
+/*
+- Dùng * để lấy tất cả các cột
+- Nên tránh dùng * trong production vì ảnh hưởng hiệu năng
+- Chỉ nên dùng khi cần xem nhanh dữ liệu
+*/
 
--- Lấy một số cột cụ thể
-SELECT first_name, last_name, salary FROM employees;
+-- 2. Lấy thông tin cụ thể với điều kiện
+SELECT
+    first_name,
+    last_name,
+    salary,
+    department_id
+FROM employees
+WHERE salary > 5000
+ORDER BY salary DESC;
+/*
+- Chỉ chọn các cột cần thiết
+- Lọc theo điều kiện lương > 5000
+- Sắp xếp giảm dần theo lương
+*/
 
--- Loại bỏ các giá trị trùng lặp
-SELECT DISTINCT department_id FROM employees;
+-- 3. Loại bỏ giá trị trùng lặp và đặt tên cột
+SELECT DISTINCT
+    department_id,
+    job_id AS position,
+    ROUND(salary/12, 2) AS monthly_salary
+FROM employees;
+/*
+- DISTINCT loại bỏ các dòng trùng lặp
+- AS đặt tên alias cho cột
+- Có thể thực hiện tính toán trong SELECT
+*/
 
--- Sắp xếp kết quả
+-- 4. Giới hạn số lượng kết quả trả về
 SELECT first_name, salary
 FROM employees
-ORDER BY salary DESC;
+WHERE department_id = 10
+ORDER BY salary DESC
+LIMIT 5;
+/*
+- Lấy 5 nhân viên có lương cao nhất của phòng ban 10
+- LIMIT giúp tối ưu hiệu năng khi không cần lấy toàn bộ dữ liệu
+*/
 ```
 
 ## 2. Mệnh đề WHERE
@@ -71,52 +104,113 @@ SELECT * FROM employees
 WHERE NOT department_id = 10;
 ```
 
-## 3. JOIN
+## 3. JOIN và Cách Kết Hợp Dữ Liệu
 
 ### 3.1 INNER JOIN
+- **Mục đích**: Lấy các dòng có giá trị khớp ở cả hai bảng
+- **Khi nào dùng**: Khi cần dữ liệu phải tồn tại ở cả hai bảng
 
 ```sql
-SELECT o.order_id, c.customer_name
+-- Lấy thông tin đơn hàng và khách hàng
+SELECT 
+    o.order_id,
+    o.order_date,
+    c.customer_name,
+    c.phone
 FROM orders o
-INNER JOIN customers c
-  ON o.customer_id = c.customer_id;
+INNER JOIN customers c ON o.customer_id = c.customer_id
+WHERE o.total_amount > 1000;
+/*
+- Chỉ trả về đơn hàng có thông tin khách hàng
+- Bỏ qua đơn hàng không có khách hàng
+- Bỏ qua khách hàng chưa có đơn hàng
+*/
 ```
 
 ### 3.2 LEFT JOIN
+- **Mục đích**: Lấy tất cả dữ liệu từ bảng trái và dữ liệu khớp từ bảng phải
+- **Khi nào dùng**: Khi cần giữ lại tất cả dữ liệu từ bảng chính, bất kể có khớp hay không
 
 ```sql
-SELECT c.customer_name, o.order_id
+-- Kiểm tra khách hàng chưa có đơn hàng
+SELECT 
+    c.customer_name,
+    c.email,
+    COUNT(o.order_id) as order_count,
+    MAX(o.order_date) as last_order_date
 FROM customers c
-LEFT JOIN orders o
-  ON c.customer_id = o.customer_id;
+LEFT JOIN orders o ON c.customer_id = o.customer_id
+GROUP BY c.customer_id, c.customer_name, c.email
+/*
+- Giữ lại tất cả khách hàng
+- Đếm số đơn hàng của mỗi khách
+- order_count = 0 với khách chưa mua hàng
+*/
 ```
 
 ### 3.3 RIGHT JOIN
+- **Mục đích**: Tương tự LEFT JOIN nhưng ưu tiên bảng phải
+- **Khi nào dùng**: Hiếm khi dùng, thường viết lại thành LEFT JOIN cho dễ đọc
 
 ```sql
-SELECT c.customer_name, o.order_id
+-- Kiểm tra đơn hàng có khách hàng bị xóa
+SELECT 
+    o.order_id,
+    o.order_date,
+    COALESCE(c.customer_name, 'DELETED') as customer
 FROM orders o
-RIGHT JOIN customers c
-  ON o.customer_id = c.customer_id;
+RIGHT JOIN customers c ON o.customer_id = c.customer_id
+/*
+- Giữ lại tất cả đơn hàng
+- Hiển thị DELETED nếu không tìm thấy khách hàng
+*/
 ```
 
 ### 3.4 FULL OUTER JOIN
+- **Mục đích**: Lấy tất cả dữ liệu từ cả hai bảng
+- **Khi nào dùng**: Khi cần kiểm tra dữ liệu không khớp ở cả hai phía
 
 ```sql
-SELECT c.customer_name, o.order_id
-FROM customers c
-FULL OUTER JOIN orders o
-  ON c.customer_id = o.customer_id;
+-- Kiểm tra tính toàn vẹn dữ liệu
+SELECT 
+    p.product_id,
+    p.product_name,
+    i.quantity,
+    CASE 
+        WHEN p.product_id IS NULL THEN 'Missing Product'
+        WHEN i.inventory_id IS NULL THEN 'Missing Inventory'
+    END as issue
+FROM products p
+FULL OUTER JOIN inventory i ON p.product_id = i.product_id
+WHERE p.product_id IS NULL OR i.inventory_id IS NULL;
+/*
+- Tìm sản phẩm không có trong kho
+- Tìm tồn kho của sản phẩm không tồn tại
+- Hữu ích cho việc kiểm tra dữ liệu
+*/
 ```
 
 ### 3.5 SELF JOIN
+- **Mục đích**: Join bảng với chính nó
+- **Khi nào dùng**: Khi cần xử lý dữ liệu phân cấp hoặc quan hệ trong cùng bảng
 
 ```sql
-SELECT e1.last_name AS employee,
-       e2.last_name AS manager
+-- Hiển thị cấu trúc quản lý nhân viên
+SELECT 
+    e1.employee_id,
+    e1.last_name as employee_name,
+    e2.last_name as manager_name,
+    e3.last_name as department_head
 FROM employees e1
-LEFT JOIN employees e2
-  ON e1.manager_id = e2.employee_id;
+LEFT JOIN employees e2 ON e1.manager_id = e2.employee_id
+LEFT JOIN employees e3 ON e2.manager_id = e3.employee_id
+ORDER BY e3.last_name, e2.last_name, e1.last_name;
+/*
+- e1: Nhân viên
+- e2: Quản lý trực tiếp
+- e3: Trưởng phòng
+- Hiển thị 3 cấp quản lý
+*/
 ```
 
 ## 4. GROUP BY và HAVING
